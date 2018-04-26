@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% load staticfiles %}
+{% block title %}参考{% endblock %}
+{% block content %}
+<div class="panel panel-default">
+    <div class="panel-heading"></div>
+    <div class="panel-body">
+        <p>历史交易参考</p>
+        <canvas id="sourceLineChart" width="400" height="200"></canvas>
+    </div>
+</div>
+{% endblock %}
+{% block js %}
+<script src="{% static 'js/Chart.min.js' %}"></script>
+<script type="text/javascript">
+var PNUM =50;
+var config = {
+        type: 'line',
+        options: {
+            responsive: true,
+            title:{
+                display:true,
+                text:'历史收益率'
+            },
+            tooltips: {
+                mode: 'point',
+                intersect: true,
+            },
+            hover: {
+                mode: 'nearest',
+                intersect: false
+            }
+        }
+    };
+  $(document).ready(function(){
+    $.getJSON('/kline/data.json',{},
+        function(data){
+          var ctx = document.getElementById("sourceLineChart").getContext("2d");
+          if((typeof data) == "string"){
+            data = JSON.parse(data);
+          }
+          config.data = data;
+           window.sourceLineChart = new Chart(ctx, config);
+        });
+
+    //window.setInterval(addData,3000);
+  });
+
+</script>
+{% endblock %}

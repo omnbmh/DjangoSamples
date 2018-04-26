@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% load staticfiles %}
+{% block title %}监控{% endblock %}
+{% block content %}
+<div class="panel panel-default">
+    <div class="panel-heading">
+        <h3 class="panel-title"></h3>
+        <div class="btn-group">
+            <button id="refresh-settings" type="button" class="btn btn-default">
+                <span class="glyphicon glyphicon-refresh"></span>
+            </button>
+            <a href="/admin/orders/setting/" type="button" class="btn btn-default">
+                <span class="glyphicon glyphicon-cog"></span>
+            </a>
+            <a href="/kline/ref" type="button" class="btn btn-default">
+                <span class="glyphicon glyphicon-info-sign"></span>
+            </a>
+            <a href="#" type="button" class="btn btn-default">
+                <span class="glyphicon glyphicon-send"></span>
+            </a>
+        </div>
+    </div>
+    <div class="panel-body">
+        <p>交易监测数据(最近24小时) 总收益:<span>{{total_income}}</span> 队列:<span>10/10</span></p>
+
+        <!-- Table -->
+        <table class="table" name="tomcat_box">
+            <tr>
+                <td>编号</td>
+                <td>交易币种</td>
+                <td>创建时间</td>
+                <td>完成时间</td>
+                <td>买价</td>
+                <td>卖价</td>
+                <td>状态</td>
+                <td>收益率(-0.004)</td>
+                <td>收益</td>
+                <td>操作</td>
+            </tr>
+            {% for item in list %}
+            <tr>
+                <td>{{item.id}}</td>
+                <td>{{item.symbol}}</td>
+                <td>{{item.created_at}}</td>
+                <td>{{item.finished_at}}</td>
+                <td>{{item.buy_price}}</td>
+                <td>{{item.sell_price}}</td>
+                <td>{{item.state}}</td>
+                <td>{{item.income_rate}}</td>
+                <td>{{item.income}}</td>
+                <td>
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-default">刷新</button>
+                    </div>
+                </td>
+
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+</div>
+{% endblock %}
+{% block js %}
+<script src="{% static 'js/hb.js' %}"></script>
+{% endblock %}
