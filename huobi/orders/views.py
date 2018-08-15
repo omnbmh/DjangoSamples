@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 
-from django.shortcuts import render
-
 # Create your views here.
 import sys
 
@@ -12,18 +10,18 @@ import time
 import threading
 import logging
 import math
+import datetime
 
 logger = logging.getLogger("django")
 from django.http import HttpResponse
-from django.core import serializers
 from django.db.models import Q
-from models import Order, OrderRelation, Symbol, CacheData, OrderRelationHistory
+from models import Order, OrderRelation, Symbol, CacheData, OrderRelationHistory, NewCoinOrder
 
-import HuobiService
-import common_calc
+from commonlib import common_calc, HuobiService
 import match
 import huobi.global_settings
 import kline.models
+from kline.views import kline_history_all_symbol
 
 FIRST_INIT_CACHE_DATA = False
 
@@ -39,10 +37,6 @@ def start_work(request):
     ana_kline_thread = threading.Thread(target=ana_kline, name='ana_kline')
     ana_kline_thread.start()
 
-    # 缓存数据
-    kline_history_thread = threading.Thread(target=kline_history, name='kline_history')
-    kline_history_thread.start()
-
     # 扫单
     loop_order_thread = threading.Thread(target=loop_order, name='loop_order')
     loop_order_thread.start()
@@ -51,6 +45,18 @@ def start_work(request):
     orders_buy_thread = threading.Thread(target=orders_buy, name='orders_buy')
     orders_buy_thread.start()
 
+    # 开启抢新币
+    orders_buy_new_coin_thread = threading.Thread(target=orders_buy_new_coin, name='orders_buy_new_coin')
+    orders_buy_new_coin_thread.start()
+
+    return_rlt = {u'status': 'ok'}
+    return HttpResponse(json.dumps(return_rlt), content_type="application/json")
+
+
+def start_t_kline_history(request):
+    # 缓存数据
+    kline_history_thread = threading.Thread(target=kline_history, name='kline_history')
+    kline_history_thread.start()
     return_rlt = {u'status': 'ok'}
     return HttpResponse(json.dumps(return_rlt), content_type="application/json")
 
@@ -109,39 +115,41 @@ def init_db_order(request):
 
 
 def save_symbol(sml):
+    # 保存币种基本信息 默认初始化为 不可交易
     base_currency = sml['base-currency']
     quote_currency = sml['quote-currency']
     s_list = Symbol.objects.filter(base_currency=base_currency, quote_currency=quote_currency)
-    if quote_currency == 'usdt':
-        if s_list and len(s_list) > 0:
-            symbol = s_list[0]
-            # symbol.base_currency = sml["base-currency"],
-            # symbol.quote_currency = sml["quote-currency"],
-            symbol.canceled_at = sml["price-precision"]
-            symbol.amount_precision = sml["amount-precision"]
-            symbol.symbol_partition = sml["symbol-partition"]
-            symbol.save()
+    # if quote_currency == 'usdt':
+    if s_list and len(s_list) > 0:
+        symbol = s_list[0]
+        # symbol.base_currency = sml["base-currency"],
+        # symbol.quote_currency = sml["quote-currency"],
+        symbol.canceled_at = sml["price-precision"]
+        symbol.amount_precision = sml["amount-precision"]
+        symbol.symbol_partition = sml["symbol-partition"]
+        symbol.state = '0'
+        symbol.save()
 
-        else:
-            symbol = Symbol(base_currency=sml["base-currency"],
-                            quote_currency=sml["quote-currency"],
-                            price_precision=sml["price-precision"],
-                            amount_precision=sml["amount-precision"],
-                            symbol_partition=sml["symbol-partition"],
-                            trade_name=sml["base-currency"] + sml["quote-currency"],
-                            state='0')
-            symbol.save()
-        logger.info(u'初始化 交易币种 %s %s' % (base_currency, quote_currency))
     else:
-        if s_list and len(s_list) > 0:
-            # 更新
-            symbol = s_list[0]
-            symbol.delete()
-            logger.info(u'初始化 删除 交易币种 %s %s' % (base_currency, quote_currency))
+        symbol = Symbol(base_currency=sml["base-currency"],
+                        quote_currency=sml["quote-currency"],
+                        price_precision=sml["price-precision"],
+                        amount_precision=sml["amount-precision"],
+                        symbol_partition=sml["symbol-partition"],
+                        trade_name=sml["base-currency"] + sml["quote-currency"],
+                        state='0')
+        symbol.save()
+    logger.info(u'初始化 交易币种 %s %s' % (base_currency, quote_currency))
+    # else:
+    #     if s_list and len(s_list) > 0:
+    #         # 更新
+    #         symbol = s_list[0]
+    #         symbol.delete()
+    #         logger.info(u'初始化 删除 交易币种 %s %s' % (base_currency, quote_currency))
 
 
-def save_order(rowData):
-    id = rowData['id']
+def save_order(row_data):
+    id = row_data['id']
 
     order_list = Order.objects.filter(id=id)
     if order_list and len(order_list) > 0:
@@ -151,20 +159,20 @@ def save_order(rowData):
             logger.info(u'初始化数据库 更新订单 ' + order.id)
     else:
         logger.info(u'新增订单 ' + str(id))
-        order = Order(account_id=rowData["account-id"],
-                      amount=rowData["amount"],
-                      canceled_at=rowData["canceled-at"],
-                      created_at=rowData["created-at"],
-                      field_amount=rowData["field-amount"],
-                      field_cash_amount=rowData["field-cash-amount"],
-                      field_fees=rowData["field-fees"],
-                      finished_at=rowData["finished-at"],
-                      id=rowData["id"],
-                      price=rowData["price"],
-                      source=rowData["source"],
-                      state=rowData["state"],
-                      symbol=rowData["symbol"],
-                      type=rowData["type"])
+        order = Order(account_id=row_data["account-id"],
+                      amount=row_data["amount"],
+                      canceled_at=row_data["canceled-at"],
+                      created_at=row_data["created-at"],
+                      field_amount=row_data["field-amount"],
+                      field_cash_amount=row_data["field-cash-amount"],
+                      field_fees=row_data["field-fees"],
+                      finished_at=row_data["finished-at"],
+                      id=row_data["id"],
+                      price=row_data["price"],
+                      source=row_data["source"],
+                      state=row_data["state"],
+                      symbol=row_data["symbol"],
+                      type=row_data["type"])
         order.save()
         logger.info(u'初始化数据库 新增订单 ' + str(order.id))
 
@@ -202,33 +210,39 @@ def ana_kline():
 
 
 def kline_history():
-    # 计时器
-    last_time_60 = 0
-    last_time_300 = 0
-    last_time_900 = 0
-    last_time_1800 = 0
-    last_time_3600 = 0
-    last_time_86400 = 0
-    while True:
-        if int(time.time()) - last_time_60 > 60:  # 1分钟
-            # save_cache_data('1min', 15)
-            last_time_60 = int(time.time())
-        if int(time.time()) - last_time_300 > 300:  # 5分钟
-            # save_cache_data('5min', 6)
-            last_time_300 = int(time.time())
-        if int(time.time()) - last_time_900 > 900:  # 15分钟
-            # save_cache_data('15min', 8)
-            last_time_900 = int(time.time())
-        if int(time.time()) - last_time_1800 > 1800:  # 30分钟
-            kline.models.save_kline_history('1day', 2)
-            last_time_1800 = int(time.time())
-        if int(time.time()) - last_time_3600 > 3600:  # 60分钟
-            # save_cache_data('60min', 8)
-            last_time_3600 = int(time.time())
-        if int(time.time()) - last_time_86400 > 86400:  # 1天
-            # save_cache_data('1day', 5)
-            last_time_86400 = int(time.time())
-        time.sleep(10)
+    logger.info('cur thread count ' + str(threading.activeCount()))
+    # 设置下一个定时
+    timer = threading.Timer(600, kline_history, [])
+    timer.start()
+    kline_history_all_symbol()
+
+    # # 计时器
+    # last_time_60 = 0
+    # last_time_300 = 0
+    # last_time_900 = 0
+    # last_time_1800 = 0
+    # last_time_3600 = 0
+    # last_time_86400 = 0
+    # while True:
+    #     if int(time.time()) - last_time_60 > 60:  # 1分钟
+    #         # save_cache_data('1min', 15)
+    #         last_time_60 = int(time.time())
+    #     if int(time.time()) - last_time_300 > 300:  # 5分钟
+    #         # save_cache_data('5min', 6)
+    #         last_time_300 = int(time.time())
+    #     if int(time.time()) - last_time_900 > 900:  # 15分钟
+    #         kline.models.save_kline_history('60min', 2)
+    #         last_time_900 = int(time.time())
+    #     if int(time.time()) - last_time_1800 > 1800:  # 30分钟
+    #         kline.models.save_kline_history('1day', 2)
+    #         last_time_1800 = int(time.time())
+    #     if int(time.time()) - last_time_3600 > 3600:  # 60分钟
+    #         # save_cache_data('60min', 8)
+    #         last_time_3600 = int(time.time())
+    #     if int(time.time()) - last_time_86400 > 86400:  # 1天
+    #         # save_cache_data('1day', 5)
+    #         last_time_86400 = int(time.time())
+    #     time.sleep(10)
 
 
 def save_cache_data(period, size):
@@ -251,8 +265,8 @@ def save_cache_data(period, size):
             save_db_cache_data(symbol.trade_name, period, 'avg_high_low', ('%.13f' % avg_high_low_c))
             save_db_cache_data(symbol.trade_name, period, 'trend', ','.join(trend_c))
             save_db_cache_data(symbol.trade_name, period, 'trend_std', ('%.13f' % trend_std_c))
-            logger.info(u'缓存数据 %s %s %d 完成' % (symbol.trade_name, period, size))
-    logger.info(u'缓存数据 %s %d 完成' % (period, size))
+            logger.info(
+                u'缓存数据 %s %s %d 完成 数据生成时间 %s' % (symbol.trade_name, period, size, fmt_timstamp(rlt_json[u'ts'] / 1000)))
     time.sleep(5)
 
 
@@ -487,23 +501,8 @@ def orders_buy():
                 q_count = len(order_rela_list) if order_rela_list else 0
                 can_buy, buy_price, buy_count = match.buy_match(symbol.trade_name, q_count)
                 if can_buy:
-                    # 买入
                     logger.info(u"策略通过 买入 %s 价格 %f 数量 %d" % (symbol.trade_name, buy_price, buy_count))
-                    rlt_json = HuobiService.send_order(str(buy_count), 'api', symbol.trade_name, 'buy-limit',
-                                                       str(buy_price))
-                    if rlt_json[u'status'] == 'ok':
-                        order_id = rlt_json[u'data']
-                        logger.info(u" 买入 %s 挂单成功 - 订单号 %s" % (symbol.trade_name, order_id))
-                        # 挂单成功 存入数据库一份
-                        order = Order(id=order_id)
-                        order.refresh()
-                        # 关系表存一份
-                        order_rela = OrderRelation(buy_order=order)
-                        order_rela.state = 'A'
-                        order_rela.save()
-                    else:
-                        logger.error(rlt_json)
-                        logger.info(u" 买入 %s 挂单失败 %s " % (symbol.trade_name, rlt_json[u'status']))
+                    send_buy_order(buy_price, buy_count, symbol, 'buy-limit')
                 else:
                     logger.info(u"策略未通过 不能买入 %s " % symbol.trade_name)
             last_time = int(time.time())
@@ -557,3 +556,110 @@ def symbol_balance(trade_name):
 
     logger.info(u'币种 %s 现持有量(不含冻结) %s' % (ban[u'currency'], ban[u'balance']))
     return balance
+
+
+def send_buy_order(buy_price, buy_count, symbol, _type):
+    rlt_json = HuobiService.send_order(str(buy_count), 'api', symbol.trade_name, _type,
+                                       str(buy_price))
+    if rlt_json[u'status'] == 'ok':
+        order_id = rlt_json[u'data']
+        logger.info(u" 买入 %s 挂单成功 - 订单号 %s" % (symbol.trade_name, order_id))
+        # 挂单成功 存入数据库一份
+        order = Order(id=order_id)
+        order.refresh()
+        # 关系表存一份
+        order_rela = OrderRelation(buy_order=order)
+        order_rela.state = 'A'
+        order_rela.save()
+        return order_id
+    else:
+        logger.error(rlt_json)
+        logger.info(u" 买入 %s 挂单失败 %s " % (symbol.trade_name, rlt_json[u'status']))
+
+
+def test(request):
+    orders_buy_new_coin()
+    return_rlt = {u'status': 'ok'}
+    return HttpResponse(json.dumps(return_rlt), content_type="application/json")
+
+
+def orders_buy_new_coin():
+    '''
+    1. 10秒 扫一下数据库
+    '''
+
+    last_time = 0
+    while True:
+        if int(time.time()) - last_time > 10:
+            logger.info(u"抢单任务 执行中")
+            # 获取抢单列表
+            new_coin_order_list = NewCoinOrder.objects.filter(state='A')
+            for nco in new_coin_order_list:
+                now_time = datetime.datetime.now()
+                print now_time
+                print nco.start_time + datetime.timedelta(hours=8)
+                # 支持 python 2 3 通用
+                time_diff = int(time.mktime((nco.start_time + datetime.timedelta(hours=8)).timetuple()) - time.mktime(
+                    now_time.timetuple()))
+                print time_diff
+                if time_diff < 60:
+                    logger.info(u" 60s抢单倒计时 买入 %s 买入量 %s " % (nco.trade_name, nco.amount))
+                    nco.state = 'P'
+                    nco.save()
+                    # 开启新线程
+                    tt = threading.Thread(target=orders_buy_new_coin_son, args=(nco,))
+                    tt.start()
+            last_time = int(time.time())
+        # 延时
+        time.sleep(5)
+
+
+def orders_buy_new_coin_son(nco):
+    last_time = 0
+    quick_flag = False
+    while True:
+        if int(time.time()) - last_time > 1 or quick_flag:
+            now_time = datetime.datetime.now()
+            # 支持 python 2 3 通用
+            time_diff = int(time.mktime(
+                now_time.timetuple()) - time.mktime((nco.start_time + datetime.timedelta(hours=8)).timetuple()))
+            if time_diff > 30:
+                # 超过 1 分钟 停止抢单
+                nco.state = 'F'
+                nco.save()
+                logger.info(u" 抢单超过1分钟 停止买入 买入 %s 买入量 %s " % (nco.trade_name, nco.amount))
+                return
+            if time_diff < 10:
+                # 小于 10s 快速抢单
+                quick_flag = True
+
+            logger.info(u" 马上抢单 买入 %s 买入量 %s " % (nco.trade_name, nco.amount))
+            rlt_json = HuobiService.send_order(str(nco.amount), 'api', nco.trade_name, 'buy-market',
+                                               str(0))
+            if rlt_json[u'status'] == 'ok':
+                order_id = rlt_json[u'data']
+                logger.info(u" 买入 %s 挂单成功 - 订单号 %s" % (nco.trade_name, order_id))
+                # 挂单成功 存入数据库一份
+                order = Order(id=order_id)
+                order.refresh()
+
+                nco.order_id = order_id
+                nco.state = 'S'
+                nco.save()
+                logger.info(u" 抢单成功 买入 %s 买入量 %s " % (nco.trade_name, nco.amount))
+                return
+            else:
+                logger.error(rlt_json)
+                logger.info(u" 买入 %s 挂单失败 %s " % (nco.trade_name, rlt_json[u'status']))
+            last_time = int(time.time())
+        # 延时
+        # time.sleep(1)
+
+# def datetime2timestamp(dt, convert_to_utc=False):
+#   ''' Converts a datetime object to UNIX timestamp in milliseconds. '''
+#   if isinstance(dt, datetime.datetime):
+#     if convert_to_utc: # 是否转化为UTC时间
+#       dt = dt + datetime.timedelta(hours=-8) # 中国默认时区
+#     timestamp = total_seconds(dt - EPOCH)
+#     return long(timestamp)
+#   return dt

@@ -2,7 +2,7 @@
 from __future__ import unicode_literals
 
 from django.db import models
-import HuobiService
+from commonlib import HuobiService
 
 # Create your models here.
 import sys
@@ -114,3 +114,15 @@ class OrderRelationHistory(models.Model):
     sell_order = models.ForeignKey(Order, to_field='id', related_name='sell_order_relation_history',
                                    verbose_name='卖单')
     created_at = models.CharField(max_length=100, verbose_name='创建时间')
+
+
+class NewCoinOrder(models.Model):
+    trade_name = models.CharField(max_length=100, verbose_name='交易币种')
+    start_time = models.DateTimeField(verbose_name='开抢时间')
+    amount = models.CharField(max_length=100, verbose_name='买入量')
+    state = models.CharField(max_length=100, verbose_name='状态 A P S F')
+    order_id = models.CharField(max_length=100, null=True, blank=True, verbose_name='订单号')
+
+    class Meta:
+        verbose_name = "抢新币单"
+        verbose_name_plural = "抢新币单"

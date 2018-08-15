@@ -150,7 +150,7 @@ def buy_match(trade_name, q_count):
         #             break
         #         else:
         #             can_buy = False
-        if cur_price and can_buy and cur_price > day1_avg and False:
+        if cur_price and can_buy and cur_price > day1_avg:
             logger.info(u"%s 大于1day均价 不购买 基准值 %f 比对值 %f" % (trade_name, cur_price, day1_avg))
             can_buy = False
         if cur_price and can_buy and cur_price > min30_avg:

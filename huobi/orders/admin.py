@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from models import OrderRelation, Symbol, Order, Setting
+from models import OrderRelation, Symbol, Order, Setting, NewCoinOrder
 
 
 # Register your models here.
@@ -18,11 +18,18 @@ class OrderRelationAdmin(admin.ModelAdmin):
 
 class SymbolAdmin(admin.ModelAdmin):
     list_display = ('trade_name', 'price_precision', 'amount_precision', 'symbol_partition', 'state',)
+    list_editable = ('state',)
+    search_fields = ('trade_name', 'state',)
+
+
+class NewCoinOrderAdmin(admin.ModelAdmin):
+    list_display = ('trade_name', 'amount', 'start_time', 'state', 'order_id',)
 
 
 admin.site.register(Order, OrderAdmin)
 admin.site.register(OrderRelation, OrderRelationAdmin)
 admin.site.register(Symbol, SymbolAdmin)
+admin.site.register(NewCoinOrder, NewCoinOrderAdmin)
 
 
 class SettingAdmin(admin.ModelAdmin):
