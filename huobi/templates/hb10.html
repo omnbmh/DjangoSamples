@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% load staticfiles %}
+{% block title %}参考{% endblock %}
+{% block css %}
+<style type="text/css">
+    label input[type=radio] {margin: 5px;}
+    label input[type=checkbox] {margin: 5px;}
+
+</style>
+{% endblock %}
+{% block content %}
+<div class="panel panel-default">
+    <div class="panel-body">
+        <p>HB10历史交易参考</p>
+        <!-- 收益率 -->
+        <canvas id="sourceLineChart" width="400" height="200"></canvas>
+    </div>
+</div>
+{% endblock %}
+{% block js %}
+<script src="{% static 'js/Chart.min.js' %}"></script>
+<script type="text/javascript">
+var PNUM =50;
+var config = {
+        type: 'line',
+        options: {
+            responsive: true,
+            title:{
+                display:true,
+                text:'HB10历史收益率'
+            },
+            tooltips: {
+                mode: 'point',
+                intersect: true,
+            },
+            hover: {
+                mode: 'nearest',
+                intersect: false
+            }
+        }
+    };
+  $(document).ready(function(){
+    $('input[name=period]').click(function(){load_chart()});
+    load_chart();
+  });
+
+  var load_chart = function(){
+      $.getJSON('/kline/kline_hb10_data.json',{},
+            function(data){
+              var ctx = document.getElementById("sourceLineChart").getContext("2d");
+              if((typeof data) == "string"){
+                data = JSON.parse(data);
+              }
+              config.data = data;
+               window.sourceLineChart = new Chart(ctx, config);
+            });
+  };
+
+</script>
+{% endblock %}
