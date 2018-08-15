@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
-
-import sys
-
-reload(sys)
-sys.setdefaultencoding('utf-8')
+# Constans 常量
+HB_10 = ['eosusdt', 'btcusdt', 'ethusdt', 'htusdt', 'bchusdt', 'xrpusdt', 'etcusdt', 'iostusdt', 'ltcusdt', 'elfusdt']
+KLINE_MAX_SIZE = 2000
+# KLINE_MAX_SIZE = 5
+# KLINE_PERIOD_ARRAY = ['1min', '5min', '15min', '30min', '60min', '1day', '1mon', '1week', '1year']
+KLINE_PERIOD_ARRAY = ['60min', '1day', '1mon', '1week', '1year']
 
 # Settings
 INCOME_MINI = 0.004  # 最小收益 千4
@@ -16,4 +17,3 @@ USDT_COUNT = 10
 # 此处填写APIKEY
 ACCESS_KEY = None
 SECRET_KEY = None
-

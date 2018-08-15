@@ -22,13 +22,26 @@ import kline.views
 
 urlpatterns = [
     url(r'^admin/', admin.site.urls),
+    # login page
+    # url(r'^accounts/login/$', 'django.contrib.auth.views.login'),
     url(r'^$', order_admin.views.index),
+    url(r'^manage/account$', order_admin.views.manage_account),
+    url(r'^manage/monitor.html', order_admin.views.manage_monitor),
+
+    url(r'^thread/kline/start', orders.views.start_t_kline_history),
+
     url(r'^order/init/symbol', orders.views.init_db_symbol),
     url(r'^order/init/order', orders.views.init_db_order),
     url(r'^order/refresh_settings', orders.views.refresh_settings),
+
     url(r'^kline/ref', kline.views.kline_ref),
+    url(r'^kline/hb10', kline.views.kline_hb10),
     url(r'^kline/data.json', kline.views.kline_data),
-    url(r'^kline/history/(?P<period>\w+)', kline.views.kline_history),
+    url(r'^kline/amount_data.json', kline.views.kline_amount_data),
+    url(r'^kline/kline_hb10_data.json', kline.views.kline_hb10_data),
+    url(r'^kline/init', kline.views.kline_history_init),
 
     url(r'^trade/start_work', orders.views.start_work),
+    # 4 test
+    # url(r'^test', orders.views.test),
 ]
